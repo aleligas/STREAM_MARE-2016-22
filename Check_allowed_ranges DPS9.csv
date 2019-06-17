@@ -1,0 +1,4 @@
+Species;Variable;Min;Max;Unit
+Parapenaeus longirostris;Length;4;50;mm
+Parapenaeus longirostris;Weight;0.5;90;g
+Parapenaeus longirostris;Age;0;6;year
