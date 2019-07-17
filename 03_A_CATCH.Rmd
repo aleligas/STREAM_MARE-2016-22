@@ -1,0 +1,677 @@
+---
+title: "Annex III.3 - STREAM: Auxiliary scripts for the conversion from the SDEF format to DG MARE Med&BS Data Call: Raising of the age distributions by ID of landings and discards. An additional option allows to use only the landings below the MCRS (to be used for the compilation of the unwanted catches in DG MARE FDI Data Call (see annex I.4)"
+author: "E. Mantzouni"
+date: "`r date()`"
+output: word_document
+---
+
+```{r  results='hide', message=FALSE, warning=FALSE}
+#R general option:
+options(stringsAsFactors = FALSE)
+
+options(warn=0)
+
+options(scipen = 999) # disable scientific notation
+
+#chunk option
+knitr::opts_chunk$set(cache=TRUE,echo=TRUE, warning=FALSE, 
+	message=FALSE, fig.height=6,progress=FALSE,verbose=FALSE,
+		include=TRUE,dev='png',autodep=FALSE)
+
+
+
+#load packages
+
+library(COSTcore)
+library(COSTeda)
+library(COSTdbe)
+
+library(tidyr)
+library(dplyr)
+library(data.table)
+library(knitr)
+
+```
+
+
+
+
+#Example of use of the script A_CATCH 
+
+
+##Settings 
+
+```{r data1, message=FALSE}
+
+path_in <- paste("C:\\Users\\Bitetto Isabella\\OneDrive - Coispa Tecnologia & Ricerca S.C.A.R.L\\MARE22\\STREAM\\FINAL REVISION OF DELIVERABLES\\SDEF_to_DG_MARE_MedBS", sep="") 
+
+setwd(path_in)
+
+```
+
+```{r "setup", include=FALSE}
+
+opts_knit$set(root.dir = path_in)
+```
+
+##Input Data
+
+Validated csData , ceData, and clData 
+
+```{r data_in1,warning=FALSE}
+
+
+load("fri-TEST.Rdata")
+
+
+
+
+head(fri_cs1@hh$foCatEu5)
+
+head(fri_cl1@cl$foCatEu5)
+head(fri_cev@ce$foCatEu5)
+
+fri_strD1 <- strIni(timeStrata="quarter", techStrata = "foCatEu5",spaceStrata = "area")
+
+fri_strD1
+
+fri_csc <- csDataCons(fri_cs1, fri_strD1)
+
+fri_clc <- clDataCons(fri_cl1, fri_strD1)
+
+fri_cec <- ceDataCons(fri_cev, fri_strD1)
+
+head(fri_csc )
+head(fri_clc)
+head(fri_cec)
+
+# extract COUNTRY  and YEAR
+COUNTRY<-unique(fri_cl1@cl$landCtry)
+YEAR=unique(fri_cl1@cl$year)
+
+```
+
+
+DG MARE Med&BS DISCARDS Table template
+
+```{r data_in3}
+
+catch.temp2<- read.table("xxx_CATCH.csv",sep=",",header=T)
+
+names(catch.temp2)
+```
+
+
+Auxiliary table: species_DIS.csv
+
+
+```{r data_in4, echo=TRUE, message=TRUE, warning=FALSE}
+
+# species file : selected species with FAO three alpha code
+
+sel_spe <-read.table("species_CATCH.csv",sep=";",header=T, na.strings = c("", "-1"," ", ".","NA") )
+head(sel_spe)
+
+```
+
+```{r data_in5}
+
+fishery<- read.table("communicationTable_for_fishery.csv",sep=";",header=T)
+
+head(fishery)
+```
+
+## Checking data
+
+Check if there are stocks with no age data and impute "-1", otherwise the bpEstim() method for  length at age gives error :
+
+```{r data_check}
+
+# get col w. all=NA by spp
+aa=fri_csc@ca %>% group_by(spp) %>% summarize_all(~all(is.na(.))) 
+
+# to make it run for len if age=NA, impute age =="-1"
+fri_csc@ca$age[fri_csc@ca$spp %in% aa$spp[aa$age==TRUE]]=-1
+
+### error if sp-quarter-gear-VL not found in both CS and CL
+
+```
+
+
+## Data analysis- raising
+
+Analysis by stock
+```{r loop by stock, warning=F, message=F}
+
+for (i in 1:dim(sel_spe)[1]) {
+  
+  STK<- sel_spe$SPECIES[i]
+  
+  AREA <- sel_spe$GSA[i]
+
+  fri_csc1<- subset(fri_csc, space==sel_spe$GSA[i],table="ca",link=T)
+  fri_clc1<- subset(fri_clc, space==sel_spe$GSA[i],table="cl")
+  
+  fri_cec1<- subset(fri_cec, space==sel_spe$GSA[i],table="ce")
+
+# Estimating age structure LAN -  -----------------------------------
+
+
+ lanEstim <-
+   dbeObject(
+     desc = paste(STK, "Landings.str", sep="_"),
+     species = STK,
+     catchCat = "LAN",
+     strataDesc = fri_strD1,
+     methodDesc = sel_spe$lanEstim_methodDesc[i]
+   )
+ 
+    # length str LAN
+    
+if ( sel_spe$lanEstim_methodDesc[i]=="analytical"){
+  lanEstim <- RaiseLgth(lanEstim, fri_csc1, fri_clc1,incl.precision =F)
+} else {
+  lanEstim <- RaiseLgthBoot(lanEstim, fri_csc1, fri_clc1,incl.precision =F,B=15)
+}
+
+# subset lenstruc for MCRS
+    
+if (!is.na(sel_spe$mcrs[i]) & sel_spe$mcrs[i]!=".") {
+  lanEstim@lenStruc$estim = 
+  lanEstim@lenStruc$estim[as.numeric(lanEstim@lenStruc$estim$length) <= sel_spe$mcrs[i],]
+  lanEstim@lenVar = lanEstim@lenVar[as.numeric(lanEstim@lenVar$length) <= sel_spe$mcrs[i],]
+}
+    
+ #########>>>>>>>>>>>>> Estimation of total numbers-at-age from market sampling
+
+ lanEstim <- RaiseAge(lanEstim, fri_csc1, fri_clc1, type = sel_spe$typeALK[i], 
+                      strataDesc = fri_strD1)
+
+ # Estimating age structure DIS - ----------------------------------------------
+
+ DIS_dbe <- dbeObject(desc= paste(STK, AREA,"Discards", sep="_"),
+                       species=STK,
+                       catchCat="DIS",
+                       strataDesc=fri_strD1,
+                       methodDesc="analytical")
+
+ # discards raising
+  
+  if (sel_spe$type[i]=="landings" ) {
+      DIS_dbe <- totVolume(DIS_dbe,fri_csc1,fri_cec1, fri_clc1, 
+                           type=sel_spe$type[i],landSpp=sel_spe$landSpp[i])
+  } else {
+     DIS_dbe <- totVolume(DIS_dbe,fri_csc1,fri_cec1, type=sel_spe$type[i])
+  }
+  
+  DIS_dbe <- RaiseAge(DIS_dbe, fri_csc1, fri_clc1,type = sel_spe$typeALK[i], 
+                      strataDesc = fri_strD1)
+
+# CATCH1 :  cols ID: MAX_AGE --------------------------------------------------------
+
+# NO SAMPLES ----------------------------------------------------------------------
+
+### No Samples == No trips (see ANNEX2- DG MARE Med&BS data call spec.).
+# Note: dbe estimates n.samples as trips*fo , thus the estimation must be based on HL
+  
+  newhl<-mergecsData(fri_cs1)@hl %>% 
+    rename("space"=area, "technical"=foCatEu5) %>% 
+    mutate(time=paste(year, quarter, sep=" - ")) %>% filter( spp==STK)
+
+  if (!is.na(sel_spe$mcrs[i]) & sel_spe$mcrs[i]!=".") { # MCRS
+    
+no.samples<- data.frame(newhl) %>% filter(lenCls<=sel_spe$mcrs[i]) %>%
+  dplyr::group_by(time,space,technical,catchCat)%>% 
+  summarize(value=n_distinct(trpCode)) 
+
+ no.samples<- no.samples%>% spread(catchCat,value)
+ 
+  L.no.samples<- no.samples%>% select(-DIS)%>% rename("value"=LAN)
+  D.no.samples<- no.samples%>% select(-LAN)%>% rename("value"=DIS)
+     
+  } else {
+    
+    no.samples<- data.frame(newhl) %>% 
+      dplyr::group_by(time,space,technical,catchCat)%>% 
+      summarize(value=n_distinct(trpCode)) 
+
+    no.samples<- no.samples%>% spread(catchCat,value)
+ 
+         L.no.samples<- no.samples%>% select(-DIS)%>% rename("value"=LAN)
+     D.no.samples<- no.samples%>% select(-LAN)%>% rename("value"=DIS)
+}
+
+# MCRS : no age and len measur. for LAN < MCRS----------------------
+
+  if (!is.na(sel_spe$mcrs[i]) & sel_spe$mcrs[i]!="."){
+    
+ # No age measurements LAN
+  
+  newca <- mergecsData(fri_cs1)@ca %>% 
+    rename("space"=area, "technical"=foCatEu5) %>% 
+    mutate(time=paste(year, quarter, sep=" - ")) %>% filter( spp==STK)
+  
+  no.age.meas.lan.mcrs<- data.frame(newca) %>%  
+    filter(lenCls<=sel_spe$mcrs[i]&!is.na(age)&catchCat=="LAN" )%>% 
+    dplyr::group_by(time,space,technical)%>% summarize(value=n()) 
+  
+  # remove technical if all ==NA  
+  no.age.meas.lan.mcrs<- no.age.meas.lan.mcrs[,!apply(is.na(no.age.meas.lan.mcrs), 2, all)]
+   
+  # No len measurements LAN
+
+     no.len.meas.lan.mcrs<- data.frame(newca) %>%  
+       filter(lenCls<=sel_spe$mcrs[i]&!is.na(lenCls)&catchCat=="LAN")%>% 
+       dplyr::group_by(time,space,technical)%>% summarize(value=n()) 
+
+  }
+  
+### end
+  
+# separate merge for age samples: may not have technical strata (use : space, time)
+  
+   if (!is.na(sel_spe$mcrs[i]) & sel_spe$mcrs[i]!=".") { 
+     # if mcrs use no.age.meas.lan.mcrs
+     list.age.smp<-list(no.age.meas.lan.mcrs,DIS_dbe@nMeas$age)
+   } else{
+     list.age.smp<-list(lanEstim@nMeas$age,DIS_dbe@nMeas$age)
+   }
+ 
+  names(list.age.smp)<-c("L.nmeas.age", "D.nmeas.age")
+  list.age.smp.merge = data.table::rbindlist(list.age.smp,id=T)
+  age.smp= spread(list.age.smp.merge,key=.id,value=value)
+
+ # list all remaining output tables (excl. age meas & no samples)
+    
+if (!is.na(sel_spe$mcrs[i]) & sel_spe$mcrs[i]!=".") { # if mcrs use no.len.meas.lan.mcrs
+     
+list2<- list(no.len.meas.lan.mcrs,DIS_dbe@nMeas$len,lanEstim@totalN$estim,
+            lanEstim@totalW$estim ,DIS_dbe@totalW$estim ,DIS_dbe@totalN$estim,
+            L.no.samples,D.no.samples)
+          
+   } else {
+     
+           list2<- list(lanEstim@nMeas$len,DIS_dbe@nMeas$len,
+                    lanEstim@totalN$estim,lanEstim@totalW$estim, 
+                    DIS_dbe@totalW$estim ,DIS_dbe@totalN$estim,
+                    L.no.samples,D.no.samples)
+   }
+ 
+names(list2)<-c("LnMeas.len","DnMeas.len","LtotalN","LtotalW","totalWDIS",
+                "totalNDIS","L.no.samples","D.no.samples")  
+
+list3=append(list.age.smp,list2)
+list..merge = data.table::rbindlist(list3,id=T,fill=T)
+     
+all.merge= spread(list..merge,key=.id,value=value)
+
+all.merge <- all.merge%>% mutate( "stock"=STK) %>% select(stock,everything())
+
+# delete rows (age...) with no "technical": a number should be given only 
+# if it relates to this fishery only 
+# (see DG MARE Med&BS Data Call specificatin - Annex 2 - Catch)
+ 
+all.merge<-  all.merge[complete.cases(all.merge$technical), ] 
+
+aa.len <- all.merge
+aa.len$totalN=all.merge$LtotalN/1000 # '000 ind
+aa.len$totalW=all.merge$LtotalW/1000 # tons
+
+aa.len$totalNDIS=all.merge$totalNDIS/1000 # '000 ind
+aa.len$totalWDIS=all.merge$totalWDIS/1000 # tons
+
+# AgeStruc : n.at.age LAN / DIS -----------------------------------------
+
+# landings
+bb<-lanEstim@ageStruc$estim
+
+bb$value=bb$value/1000 # '000 ind
+
+bb<-rename(bb, "n.at.age"=value)
+
+# discards
+bbd<-DIS_dbe@ageStruc$estim
+
+bbd$value=bbd$value/1000 # '000 ind
+
+bbd<-rename(bbd, "DIS.n.at.age"=value)
+
+ab<- left_join(bb,bbd) %>% left_join(aa.len)
+
+  
+ab<- ab %>% separate(technical, c("gear","FISHERY", "VL","MESH_SIZE_RANGE"), 
+                     sep = "_")
+
+# min age/ max age----------------------------------------------------------
+
+
+ab$age <- as.numeric(as.character(ab$age))
+
+ab <- ab%>% group_by(time,   space , gear,FISHERY  , VL ,MESH_SIZE_RANGE ) %>%
+  mutate(minage=min(age,na.rm=T),maxage=max(age,na.rm=T))
+
+ab <- ab %>% separate(time, c("Year","Quarter")," - ",remove=F)
+
+# ### >>>>>>>>>. catch1: info by row --------------------------------------
+
+
+catch1= data.frame(
+  ID = NA , 
+  COUNTRY =COUNTRY ,
+  YEAR = YEAR ,
+  QUARTER = ab$Quarter ,
+  VESSEL_LENGTH = ab$VL ,
+  GEAR = ab$gear ,
+  MESH_SIZE_RANGE = ab$MESH_SIZE_RANGE ,
+  FISHERY = ab$FISHERY[i] ,
+  AREA = AREA ,
+  SPECON = sel_spe$specon_catch[i] , 
+  SPECIES = STK , 
+  LANDINGS = ab$totalW , # MCRS: meanW.at.age * n.at.age
+  DISCARDS = ab$totalWDIS,
+  NO_SAMPLES_LANDINGS =ab$L.no.samples, # = TRIPS
+  NO_LENGTH_MEASUREMENTS_LANDINGS = ab$LnMeas.len ,
+  NO_AGE_MEASUREMENTS_LANDINGS = ab$L.nmeas.age ,
+  NO_SAMPLES_DISCARDS = ab$D.no.samples , # = TRIPS
+  NO_LENGTH_MEASUREMENTS_DISCARDS = ab$DnMeas.len , 
+  NO_AGE_MEASUREMENTS_DISCARDS = ab$D.nmeas.age, 
+  NO_SAMPLES_CATCH = 0,
+  NO_LENGTH_MEASUREMENTS_CATCH = 0,
+  NO_AGE_MEASUREMENTS_CATCH = 0 , 
+  MIN_AGE = ab$minage ,
+  MAX_AGE = ab$maxage 
+)
+
+# if mcrs delete LANDINGS: estimated below
+if (!is.na(sel_spe$mcrs[i]) & sel_spe$mcrs[i]!="."){ 
+  catch1<-catch1 %>% select(-LANDINGS)
+}
+
+# ### >>>>>>>>>. catch1: no samples & no meas.  ---------------------------
+
+# NO_SAMPLES_CATCH - NO_LENGTH_MEASUREMENTS_CATCH -NO_AGE_MEASUREMENTS_CATCH
+
+catch1 <- catch1 %>% mutate(
+  NO_SAMPLES_CATCH = rowSums( cbind (NO_SAMPLES_LANDINGS , NO_SAMPLES_DISCARDS), 
+                              na.rm=TRUE),
+  NO_LENGTH_MEASUREMENTS_CATCH = rowSums( cbind (NO_LENGTH_MEASUREMENTS_DISCARDS , 
+                                                 NO_LENGTH_MEASUREMENTS_LANDINGS),
+                                          na.rm=TRUE),
+  
+  NO_AGE_MEASUREMENTS_CATCH=rowSums( cbind (NO_AGE_MEASUREMENTS_DISCARDS,
+                                            NO_AGE_MEASUREMENTS_LANDINGS), 
+                                     na.rm=TRUE)) %>% distinct()
+
+# ############ >>>>>> LAN- DIS n.at.age ------------------------------------
+
+
+# matrix with all combinations of "time" "space"  "gear" "VL" 
+# "MESH_SIZE_RANGE" "length"
+
+ab[,c(1:8)][is.na(ab[,c(1:8)])]<-1
+
+dt <- as.data.table(ab )
+
+seq_l <-  try(seq(0, 19, by = 1),silent=T)
+if(class(seq_l)=="try-error"){seq_l=-1}
+  
+  dt$id<- paste(dt$time,dt$space,dt$gear,dt$FISHERY,dt$VL,dt$MESH_SIZE_RANGE,
+                sep=":")
+  dt1<- dt[, list(age = seq_l), by = id]
+  dt1<- dt1 %>% separate(id, c("time", "space", "gear", "FISHERY",
+                               "VL","MESH_SIZE_RANGE"), sep = ":")
+  
+   dt2=left_join(dt1,ab %>% select("time" , "space", "gear" , "FISHERY",
+                                   "VL" , "MESH_SIZE_RANGE","age","n.at.age",
+                                   "DIS.n.at.age","stock" ))
+
+  dt2$stock=STK
+
+#  MEAN LENGTH LAND, MEAN WEIGHT LAND -------------------------------------
+
+#####>>>>>>>>>>> LAN weight at age!!
+
+wtEstim_An <-
+  dbeObject(
+    desc = "Weights at age",
+    species = STK,
+    catchCat = "LAN",
+    param = "weight",
+    strataDesc = fri_strD1, # strBP,
+    methodDesc = sel_spe$methodDesc_LAN.age.wght[i]
+  )
+
+
+
+if(sel_spe$methodDesc_LAN.age.wght[i]=="analytical") {
+  wtEstim_An <- bpEstim(wtEstim_An, fri_csc1, adjust = sel_spe$adjust_L.w.a[i])
+ } else{
+  wtEstim_An <- bpBoot(wtEstim_An, fri_csc1, adjust = sel_spe$adjust_L.w.a[i])
+}
+
+# # LAN mean weight at age -------------------------------------------------
+
+cc=wtEstim_An@ageStruc$estim
+  
+cc$value<- cc$value/1000 # g ->kg
+
+cc$age=as.numeric(as.character(cc$age))
+cc=rename(cc, "meanW.at.age"=value)
+cc=cc %>% separate(technical, c("gear", "FISHERY","VL","MESH_SIZE_RANGE"), 
+                   sep = "_")
+
+# LAN length at age --------------------------------------------------------
+
+LEstim_An <-
+  dbeObject(
+    desc = "Length at age",
+    species = STK,
+    catchCat = "LAN",
+    param = "length",
+    strataDesc = fri_strD1, # strBP,
+    methodDesc = sel_spe$methodDesc_LAN.len.age[i]
+  )
+
+
+if(sel_spe$methodDesc_LAN.len.age[i]=="analytical") {
+LEstim_An <-  bpEstim(LEstim_An, fri_csc1, adjust = sel_spe$adjust_L.len.a[i])
+  
+ } else{
+  LEstim_An <-  bpBoot(LEstim_An, fri_csc1, adjust = sel_spe$adjust_L.len.a[i])
+}
+
+# LAN mean length at age -----------------------------------------------------
+
+ff=LEstim_An@ageStruc$estim
+
+UNIT <- unique(fri_csc1@ca$lenCode[fri_csc1@ca$spp==STK]) 
+if (UNIT=="mm" || "MM"){
+  ff$value <- ff$value/10  # mm-> cm
+}
+
+
+ff$age=as.numeric(as.character(ff$age))
+ff=rename(ff, "meanL.at.age"=value)
+ff=ff %>% separate(technical, c("gear","FISHERY", "VL","MESH_SIZE_RANGE"), 
+                   sep = "_")
+
+
+# MEAN LENGTH DISCARD, MEAN WEIGHT DISCARD --------------------------------
+
+# DIS weight at age -------------------------------------------------------
+
+
+DwtEstim_An <-
+  dbeObject(
+    desc = "Weights at age",
+    species = STK,
+    catchCat = "DIS",
+    param = "weight",
+    strataDesc = fri_strD1, # strBP,
+    methodDesc = sel_spe$methodDesc_DIS.age.wght[i]
+  )
+
+
+if(sel_spe$methodDesc_DIS.age.wght[i]=="analytical") {
+  DwtEstim_An <- bpEstim(DwtEstim_An, fri_csc1, adjust = sel_spe$adjust_D.w.a[i])
+} else{
+  DwtEstim_An <- bpBoot(DwtEstim_An, fri_csc1, adjust = sel_spe$adjust_D.w.a[i])
+}
+
+# DIS mean weight at age
+ccD=DwtEstim_An@ageStruc$estim
+
+ccD$value <- ccD$value/1000 # g -> kg
+
+ccD$age=as.numeric(as.character(ccD$age))
+ccD=rename(ccD, "DmeanW.at.age"=value)
+ccD=ccD %>% separate(technical, c("gear", "FISHERY","VL","MESH_SIZE_RANGE"), 
+                     sep = "_")
+
+# DIS length at age -----------------------------------------------------------
+
+DLEstim_An <-
+  dbeObject(
+    desc = " Length at age",
+    species = STK,
+    catchCat = "DIS",
+    param = "length",
+    strataDesc = fri_strD1, # strBP,
+    methodDesc = sel_spe$methodDesc_DIS.len.age[i]
+  )
+
+if(sel_spe$methodDesc_DIS.len.age[i]=="analytical") {
+  DLEstim_An <- bpEstim(DLEstim_An, fri_csc1, adjust = sel_spe$adjust_D.len.a[i])
+ } else{
+ DLEstim_An <- bpBoot(DLEstim_An, fri_csc1, adjust = sel_spe$adjust_D.len.a[i])
+ }
+
+####### >> DIS mean length at age
+ffD=DLEstim_An@ageStruc$estim
+
+UNIT <- unique(fri_csc1@ca$lenCode[fri_csc1@ca$spp==STK]) 
+if (UNIT=="mm" || "MM"){
+ffD$value <- ffD$value/10  # mm-> cm
+}
+
+ffD$age=as.numeric(as.character(ffD$age))
+ffD=rename(ffD, "DmeanL.at.age"=value)
+ffD=ffD %>% separate(technical, c("gear", "FISHERY","VL","MESH_SIZE_RANGE"), 
+                     sep = "_")
+
+# ## combine: w.age, l.age, no.age (LAN- DIS)... to get CATCH cols --------
+
+l3=list(dt2,cc,ff,ccD,ffD)
+
+l3=lapply(l3, function(x){ x[,c(1:6)][is.na(x[,c(1:6)])]<- -1;return(x)})
+
+
+cfdt2=Reduce(function(x, y) merge(x, y, by = c("time", "space",  "gear" ,
+          "FISHERY","VL","MESH_SIZE_RANGE" ,"age"  ),all.x=T), l3)
+
+dt3 = try(data.table::dcast(setDT(distinct(cfdt2)),
+                            time + space + gear +FISHERY+ VL+MESH_SIZE_RANGE ~ age, 
+                            value.var = c("n.at.age","DIS.n.at.age","meanW.at.age",
+                                "meanL.at.age","DmeanW.at.age","DmeanL.at.age",
+                                "age" )),silent=T)
+
+# if mcrs 
+# Landings= meanW.at.age*n.at.age
+if (!is.na(sel_spe$mcrs[i]) & sel_spe$mcrs[i]!="."){ 
+  
+  # tonnes
+landings <- cfdt2 %>% mutate(LANDINGS= meanW.at.age*n.at.age) %>% 
+  select(time, space, gear, FISHERY, VL, MESH_SIZE_RANGE,LANDINGS)
+
+landings <- landings[!is.na(landings$LANDINGS ), ]
+
+dt3<-left_join(dt3,landings)
+
+}
+
+## rename col to match CATCH
+
+names(dt3)[grep("DIS.n.at.age", names(dt3)) ]<-paste("AGE", 
+              0:(length(grep("DIS.n.at.age", names(dt3)))-1),"NO_DISCARD",sep="_")
+
+names(dt3)[grep("n.at.age", names(dt3)) ]<-paste("AGE", 
+              0:(length(grep("n.at.age", names(dt3)))-1),"NO_LANDED",sep="_")
+
+names(dt3)[grep("DmeanW.at.age", names(dt3)) ]<-paste("AGE", 
+              0:(length(grep("DmeanW.at.age", names(dt3)))-1),"MEAN_WEIGHT_DISCARD",
+              sep="_")
+
+names(dt3)[grep("DmeanL.at.age", names(dt3)) ]<-paste("AGE", 
+              0:(length(grep("DmeanL.at.age", names(dt3)))-1),"MEAN_LENGTH_DISCARD",
+              sep="_")
+
+names(dt3)[grep("meanW.at.age", names(dt3)) ]<-paste("AGE", 
+              0:(length(grep("meanW.at.age", names(dt3)))-1),"MEAN_WEIGHT_LANDED",
+              sep="_")
+
+names(dt3)[grep("meanL.at.age", names(dt3)) ]<-paste("AGE", 
+              0:(length(grep("meanL.at.age", names(dt3)))-1),"MEAN_LENGTH_LANDED",
+              sep="_")
+
+names(dt3)[grep("age.1", names(dt3))]<-paste("AGE", 
+              0:(length(grep("age.1", names(dt3)))-1),sep="_")
+
+dt3 <- dt3 %>% separate(time, c("Year","Quarter")," - ",remove=T)
+
+
+###########\\
+
+# FINAL CATCH TAB ---------------------------------------------------------
+
+catch1<- catch1 %>% mutate_at(vars( c(ID:SPECIES) ), 
+          funs( ifelse( is.na(.), -1, .) ) )
+
+
+dt3<- dt3 %>% mutate_at(vars( c(Year:MESH_SIZE_RANGE) ), 
+          funs( ifelse( is.na(.), -1, .) ) )
+
+catch1$YEAR=as.character(catch1$YEAR)
+catch1$FISHERY=as.character(catch1$FISHERY)
+catch.tab <- left_join(catch1,dt3,by=c( "QUARTER"  ="Quarter" ,  "YEAR"="Year",
+                  "AREA"="space", "GEAR"="gear" ,  "VESSEL_LENGTH" = "VL" ,
+                  "MESH_SIZE_RANGE","FISHERY"  ))
+
+ # FISHERY to DG MARE Med&BS codification
+  catch.tab$FISHERY <- fishery$SDEF_codification[match(catch.tab$FISHERY , 
+                                      fishery$DGMARE_Med_BS_codification)]
+  
+  # species to FAO three alpha code and set ID (COUNTRY, AREA, GEAR, VESSEL_LENGTH, 
+  # MESH_SIZE_RANGE,QUARTER, SPECIES)
+ catch.tab <- catch.tab %>% 
+   mutate(SPECIES=sel_spe$SPE[match(SPECIES,sel_spe$SPECIES)],
+    ID = paste(COUNTRY, AREA, GEAR,FISHERY, VESSEL_LENGTH, MESH_SIZE_RANGE,
+               YEAR, QUARTER, SPECIES, sep = "_"))
+ 
+catch.tab$YEAR=as.numeric(catch.tab$YEAR)
+catch.temp2<-bind_rows(catch.temp2,catch.tab)
+
+}
+
+```
+
+##Output
+
+```{r data_ou1}
+
+  # col after 12: set -1 or NA to 0 
+catch.temp2[,-c(1:11)][is.na(catch.temp2[,-c(1:11)])] <- 0
+
+catch.temp2<-setDT(catch.temp2)
+for (jj in c(12:171)) set(catch.temp2, i = which(catch.temp2[[jj]]==-1), 
+                          j = jj, v = 0)
+
+catch.temp2<-setDF(catch.temp2)
+
+write.table(catch.temp2, file = "CATCH.csv",row.names=FALSE,sep=";",
+            na="-1")
+
+head(catch.temp2)
+
+  
+```
+

@@ -1,0 +1,4 @@
+SPECIES;SPE;LC_RANGE;GSA;typeALK;mcrs;specon_catch;type;landSpp;lanEstim_methodDesc;methodDesc_LAN.age.wght;methodDesc_LAN.len.age;methodDesc_DIS.age.wght;methodDesc_DIS.len.age;adjust_L.w.a;adjust_D.w.a;adjust_L.len.a;adjust_D.len.a
+Merluccius merluccius;HKE;10;GSA99;fixed;;;trip;;analytical;analytical;analytical;analytical;analytical;T;F;T;F
+Mullus barbatus;MUT;10;GSA99;fixed;70;;trip;;analytical;analytical;analytical;analytical;analytical;F;T;F;T
+Merluccius merluccius;HKE;10;GSA99;fixed;110;;trip;;analytical;analytical;analytical;analytical;analytical;T;F;T;F

@@ -1,0 +1,179 @@
+---
+title: "Annex III.7 - STREAM: Auxiliary scripts for the conversion from the SDEF format to DG MARE Med&BS Data Call: Calculation of sex ratio at age using the COST methods (see COST User Manual- Chapter 12, for the full method description)"
+author: "E. Mantzouni"
+date: "`r date()`"
+output: word_document
+---
+
+
+
+#Tools
+
+R, Rstudio and packages.
+
+
+```{r results='hide', message=FALSE, warning=FALSE}
+#R general option:
+options(stringsAsFactors = FALSE)
+
+options(warn=0)
+
+#chunk option
+knitr::opts_chunk$set(cache=TRUE,echo=TRUE, warning=FALSE, 
+	message=FALSE, fig.height=6,progress=FALSE,verbose=FALSE,
+		include=TRUE,dev='png',autodep=FALSE)
+
+
+
+#load packages
+
+library(COSTcore)
+library(COSTeda)
+library(COSTdbe)
+
+library(tidyr)
+library(dplyr)
+library(knitr)
+```
+
+
+#Example of use of the script SRA
+
+This script implements the  Calculation of  sex ratio at age, 
+required for the DG MARE Med&BS Data Call, using as input file the SDEF format (CS table) and COST as the raising proceedure
+
+
+##Settings 
+
+```{r data1}
+
+path <- paste("C:\\Users\\Bitetto Isabella\\OneDrive - Coispa Tecnologia & Ricerca S.C.A.R.L\\MARE22\\STREAM\\FINAL REVISION OF DELIVERABLES\\SDEF_to_DG_MARE_MedBS", sep="") 
+
+setwd(path)
+  
+```
+
+```{r "setup", include=FALSE}
+require("knitr")
+opts_knit$set(root.dir = path)
+```
+
+##Input Data
+
+csData of the SDEF format 
+
+```{r data_in1}
+
+load("fri_cs_test.Rdata")
+
+head( fri_cs@ca)
+
+
+# extract COUNTRY
+COUNTRY<-unique(fri_cs@ca$landCtry)
+
+```
+ stratification: spatial only
+```{r data_str}
+
+
+fri_strD <- strIni(spaceStrata="area") 
+
+```
+
+DG MARE Med&BS SRA Table template
+
+```{r data_in2}
+
+sra.temp2<- read.table("xxx_SRA.csv",sep=",",header=T)
+
+names(sra.temp2)
+```
+
+
+Auxilliary table: species_BIO_SRA.csv
+
+
+```{r data_in3}
+
+# species file : selected species with FAO three alpha code
+
+sel_spe<-read.table( "species_BIO_SRA.csv", header=TRUE, sep=";",row.names=NULL) 
+
+head(sel_spe)
+
+```
+
+
+## Data analysis- raising
+
+Analysis by stock
+```{r loop by stock}
+
+for (i in 1:dim(sel_spe)[1]) {
+
+  STK<- sel_spe$SPECIES[i]
+  
+    fri_cs1<- subset(fri_cs, year%in% seq(sel_spe$START_YEAR[i],
+                                          sel_spe$END_YEAR[i],by=1),table="ca",link=T)
+   
+# Validate- consolidate 
+fri_csv <- csDataVal(fri_cs1)
+fri_csc<- csDataCons(fri_csv, fri_strD)
+  
+  fri_csc1<- subset(fri_csc, space==sel_spe$GSA[i],table="ca")
+  
+MS_SEX_An<-dbeObject(desc="SEX-ratio",species=STK,param="sex",
+                     strataDesc=fri_strD,methodDesc=sel_spe$methodDesc[i],
+                     nboot=sel_spe$nboot[i])
+
+
+if (sel_spe$methodDesc[i]=="bootstrap"){
+MS_SEX_An<-bpBoot(MS_SEX_An,fri_csc1,adjust=sel_spe$adjust[i])
+} else {
+MS_SEX_An<-bpEstim(MS_SEX_An,fri_csc1,adjust=sel_spe$adjust[i])
+}
+
+dfSRA <-
+  data.frame(
+    
+    COUNTRY = COUNTRY ,
+    AREA = MS_SEX_An@ageStruc[["estim"]][["space"]] ,
+     START_YEAR = sel_spe$START_YEAR[i] ,
+    END_YEAR = sel_spe$END_YEAR[i] ,
+    SPECIES = STK ,
+    AGECLASS =  MS_SEX_An@ageStruc[["estim"]][["age"]] ,
+    SEX_RATIO = MS_SEX_An@ageStruc[["estim"]][["value"]],
+    COMMENTS = sel_spe$COMMENTS[i] 
+  )
+
+
+dfSRA<-dfSRA %>% mutate(SPECIES=sel_spe$SPE[match(STK,sel_spe$SPECIES)])
+
+dfSRA <- dfSRA[complete.cases(dfSRA[, -which(names(dfSRA) %in% c("COMMENTS"))]),]
+
+dfSRA$AGECLASS <- as.numeric(as.character(dfSRA$AGECLASS))
+
+sra.temp2=bind_rows(sra.temp2, dfSRA)
+
+
+}
+
+
+
+```
+
+##Output
+
+```{r data_ou1}
+
+# export DG MARE Med&BS SRA table
+write.table(format(sra.temp2,digits=3, scientific=F),
+            file="SRA.csv",dec=".",sep=",",col.names=TRUE,
+            row.names=FALSE,na="-1")
+
+head(sra.temp2)
+```
+
+
+
