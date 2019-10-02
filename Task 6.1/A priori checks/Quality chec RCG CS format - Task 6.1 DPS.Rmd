@@ -1,0 +1,171 @@
+---
+title: "Quality check RCG CS format (STREAM project, Task 6.1)"
+
+output:
+   word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include=FALSE, warning=FALSE}
+
+library(ggplot2)
+
+# Input to be updated by the user:
+setwd("C://Ale//PROGETTI IN CORSO//MARE201622//WP6 STREAM//Task 6.1//DPS9 a priori checks")
+name_file=  "DPS9 RCGformat"
+immature_stages=c("0","1","2a")
+########################################################
+
+
+
+
+data= read.table(paste(name_file,".csv",sep=""),sep=";",header=T)
+x=paste("Checking the file ", name_file,".csv",sep="")
+```
+`r x`
+
+# Check 1: consistency of LFD by year and consistency with allowed ranges
+
+The LFDs available in the sampling data are reported in Figure 1. 
+
+```{r, fig.cap= "Figure 1 - Sampling data: LFDs by year.", fig.width=10, fig.height=8, warning=FALSE,include=TRUE,echo=FALSE}
+
+print(ggplot(data=data, aes(x=Length.class,y= Number.at.length)) + geom_histogram(stat="identity",colour = "blue", fill = "blue", binwidth = 0.5) + facet_grid(Year~ .))
+
+paste("The maximum length class in the data is: ",max(data$Length.class)/10," cm",sep="")
+paste("The minimum length class in the data is: ",min(data$Length.class)/10," cm",sep="")
+
+```
+
+If any record resulted outside the allowed range, it is showed below.
+
+```{r, fig.cap= "Figure 1 - Sampling data: LFDs by year.", fig.width=10, fig.height=8, warning=FALSE,include=TRUE,echo=FALSE}
+
+allowed_ranges=read.table("Check_allowed_ranges DPS9.csv",sep=";",header=T)  
+
+
+error_min_length=data[data$Length.class<allowed_ranges[allowed_ranges$Variable=="Length"]$Min[1], ]
+error_max_length=data[data$Length.class>allowed_ranges[allowed_ranges$Variable=="Length"]$Max[1], ]  
+
+if (nrow(error_min_length)!=0 | nrow(error_min_length)!=0){
+
+  print(paste("Records with length outside the allowed range:"), quote=F)  
+  print(error_min_length)  
+  print(error_max_length)  
+  
+} else {
+print("No error occurred", quote=F)
+
+}
+```
+# Check 2: consistency of LFD by year and commercial category
+
+The LFDs by commercial category and year are shown in Figure 2.
+
+```{r, fig.cap= "Figure 2 - Sampling data: LFDs by commercial category and by year.", fig.width=10, fig.height=8, warning=FALSE,include=TRUE,echo=FALSE}
+# Check consistency of LFD by year and commercial category
+ggplot(data=data, aes(x=Length.class,y= Number.at.length)) + geom_histogram(stat="identity",colour = "tan2", fill = "tan2", binwidth = 0.5) + facet_grid(Year~ Commercial.size.category)
+
+```
+
+```{r, fig.cap= "Figure 1 - Sampling data: LFDs by year.", fig.width=10, fig.height=8, warning=FALSE,include=TRUE,echo=FALSE}
+
+# Summary table with ranges by year and commercial category 
+
+pivot_min=aggregate(data$Length.class,by=list(data$Year,data$Commercial.size.category),FUN="min")
+colnames(pivot_min)=c("Year","Commercial_size_category","Min")
+pivot_max=aggregate(data$Length.class,by=list(data$Year,data$Commercial.size.category),FUN="max")
+colnames(pivot_max)=c("Year","Commercial_size_category","Max")
+merge(pivot_min,pivot_max, by=c("Year","Commercial_size_category"))
+
+```
+
+# Check 5: Check consistency sex and maturity stage
+
+The scatter plots of length versus maturity stage, by year and by sex are reported in Figure 5. A summary table of the sex and maturity measurements in the sampling data follows.
+
+```{r, fig.cap= "Figure 5 - Sampling data: Scatter plot of maturity stage versus length by year and sex.", fig.width=10, fig.height=8, warning=FALSE,include=TRUE,echo=FALSE}
+
+# Check consistency maturity stage
+ggplot(data=data, aes(x=Length.class,y=Maturity.Stage ,col=Sex)) + geom_point(stat="identity", fill = "darkorchid4", binwidth = 0.5) + facet_grid(Year~ Sex)
+
+
+# summary table of number of individuals by length class by maturity stage
+data_sex=data[!is.na(data$Sex),]
+
+tab_sex=aggregate(data_sex$Number.at.length,by=list(data_sex$Year,data_sex$Length.class),FUN="length")
+colnames(tab_sex)=c("Year","Length_class","nb_sex_measurements")
+tab_sex
+
+
+# summary table of number of individuals by length class by maturity stage
+data_mat=data[!is.na(data$Maturity.Stage),]
+
+tab_mat=aggregate(data_mat$Number.at.length,by=list(data_mat$Year,data_mat$Length.class),FUN="length")
+colnames(tab_mat)=c("Year","Length_class","nb_maturity_stage_measurements")
+tab_mat
+
+# Maturity ogive
+data_mat$Mature[as.character(data_mat$Maturity.Stage) %in% immature_stages]= 0
+data_mat$Mature[!(as.character(data_mat$Maturity.Stage) %in% immature_stages)]= 1
+
+mat=data_mat[data_mat$Mature==1,colnames(data_mat) %in%c("Year","Sex","Length.class","Mature","Number.at.length")]
+immat=data_mat[data_mat$Mature==0,colnames(data_mat) %in%c("Year","Sex","Length.class","Mature","Number.at.length")]
+
+merge= merge(mat,immat,by=c("Length.class","Year","Sex"),all=TRUE)
+
+colnames(merge)[4]="Mature"
+colnames(merge)[6]="Immature"
+
+merge=merge[,c(1,2,3,4,6)]
+
+merge[is.na(merge$Mature),]$Mature=0
+merge[is.na(merge$Immature),]$Immature=0
+merge$Total=merge$Mature+merge$Immature
+```
+
+The maturity ogives estimated by sex are reported in Figure 6 and 7, considering as immature stages `r immature_stages`, aggregating all the maturity data available in the dataset.
+
+```{r, fig.cap= "Figure 6 - Sampling data: Maturity ogive females.", fig.width=5, fig.height=5, warning=FALSE,include=TRUE,echo=FALSE}
+
+#females
+merge_temp=merge[as.character(merge$Sex)!="M"& as.character(merge$Sex)!="N",]
+
+
+years= paste("(",min(merge_temp$Year),"-",max(merge_temp$Year),")",sep="")
+
+Mat=aggregate(merge_temp$Mature,by=list(merge_temp$Length.class),FUN="sum")
+Immat=aggregate(merge_temp$Immature,by=list(merge_temp$Length.class),FUN="sum")
+
+merge_temp=merge(Mat,Immat,by=c("Group.1"), all=T)
+colnames(merge_temp)=c("Length.class","Mature","Immature")
+merge_temp$Total=rowSums(data.frame(merge_temp$Mature,merge_temp$Immature))
+
+
+mod <- glm(cbind(merge_temp$Mature,merge_temp$Immature) ~ merge_temp$Length.class, family=binomial("logit"))
+
+coeff=coefficients(mod)
+L50=-coeff[1]/coeff[2]
+IFM=summary(mod)$cov.scaled
+I11=IFM[1,1]
+I12=IFM[1,2]
+I22=IFM[2,2]
+SE_L50=sqrt((I11+2*L50*I12+(L50^2)*I22)/(coeff[2]^2))
+#inverse of Information Fisher's Matrix
+L75=(log(0.75/0.25)-coeff[1])/coeff[2]
+L25=(log(0.25/0.75)-coeff[1])/coeff[2]
+MR=L75-L25
+SE_MR= 2*log(3,exp(1))/((coeff[2])^2)*sqrt(I22) 
+
+
+plot(merge_temp$Length.class, merge_temp$Mature/merge_temp$Total,cex=1.5,xlab="length(cm)",ylab="proportion of matures",main=paste("Females",years,sep=""))  
+
+lines(merge_temp$Length.class,predict(mod,new.data=merge_temp$Length.class,type="response"),col="deeppink3",lty=1,lwd=3)
+legend("bottomright",paste(c("L50= ","MR= "),c(round(L50,3),round(MR,3)),"+/-",c(round(SE_L50,3),round(SE_MR,3))))
+
+```
+
+
