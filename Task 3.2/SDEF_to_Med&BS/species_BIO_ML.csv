@@ -1,0 +1,3 @@
+SPECIES;SPE;GSA;SEX;START_YEAR;END_YEAR;IMMATURE;MAT_METHOD;methodDesc;nboot
+Merluccius merluccius;HKE;GSA99;M;9999;9999;0_1_2a;macroscopically;analytical;.
+Mullus barbatus;MUT;GSA99;M_F;9999;9999;1;macroscopically;bootstrap;10

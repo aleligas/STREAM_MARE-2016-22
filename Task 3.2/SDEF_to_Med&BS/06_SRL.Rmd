@@ -1,0 +1,193 @@
+---
+title: "Annex III.6 - STREAM: Auxiliary scripts for the conversion from the SDEF format to DG MARE Med&BS Data Call: Calculation of sex ratio at length using the COST methods (see COST User Manual- Chapter 12, for the full method description)"
+author: "E. Mantzouni"
+date: "`r date()`"
+output: word_document
+---
+
+
+#Tools
+
+R, Rstudio and packages.
+
+
+```{r results='hide', message=FALSE, warning=FALSE}
+#R general option:
+options(stringsAsFactors = FALSE)
+
+options(warn=0)
+
+#chunk option
+knitr::opts_chunk$set(cache=TRUE,echo=TRUE, warning=FALSE, 
+	message=FALSE, fig.height=6,progress=FALSE,verbose=FALSE,
+		include=TRUE,dev='png',autodep=FALSE)
+
+
+
+#load packages
+
+library(COSTcore)
+library(COSTeda)
+library(COSTdbe)
+
+library(tidyr)
+library(dplyr)
+```
+
+
+#Example of use of the script SRL
+
+This script implements the  Calculation of  sex ratio at length, 
+required for the DG MARE Med&BS Data Call, using as input file the SDEF format (CS table) and COST as the raising proceedure
+
+
+##Settings
+
+```{r data1}
+
+path <- paste("C:\\Users\\Bitetto Isabella\\OneDrive - Coispa Tecnologia & Ricerca S.C.A.R.L\\MARE22\\STREAM\\FINAL REVISION OF DELIVERABLES\\SDEF_to_DG_MARE_MedBS", sep="") 
+
+setwd(path)
+  
+```
+
+```{r "setup", include=FALSE}
+require("knitr")
+opts_knit$set(root.dir = path)
+```
+
+##Input Data
+
+csData of the SDEF format 
+
+```{r data_in1}
+load("fri_cs_test.Rdata")
+head( fri_cs@ca)
+
+
+# extract COUNTRY
+COUNTRY<-unique(fri_cs@ca$landCtry)
+
+```
+
+
+ stratification: spatial only
+```{r data_str}
+
+fri_strD <- strIni(spaceStrata="area") 
+
+```
+
+DG MARE Med&BS SRL Table template
+
+```{r data_in2}
+
+srl.temp2<- read.table("xxx_SRL.csv",sep=",",header=T)
+
+names(srl.temp2)
+```
+
+
+Auxilliary table:  species_BIO_SRL.csv
+
+
+```{r data_in3}
+
+# species file : selected species with FAO three alpha code
+
+sel_spe<-read.table( "species_BIO_SRL.csv", header=TRUE, sep=";",row.names=NULL) 
+
+head(sel_spe)
+
+```
+
+
+## Checking data
+
+Check if there are stocks with no age data and impute "-1", otherwise the bpEstim() method for sex ratio at length gives error :
+
+```{r data_check}
+
+# get col w. all=NA by spp
+aa<- fri_cs@ca %>% group_by(spp) %>% summarize_all(~all(is.na(.))) 
+
+aa$spp[aa$age==FALSE] # spp with age data 
+
+# impute "-1" if a stock has no age data
+fri_cs@ca$age[fri_cs@ca$spp %in% aa$spp[aa$age==TRUE]]<- -1
+
+
+```
+
+
+
+## Data analysis- raising
+
+Analysis by stock
+```{r loop by stock}
+
+
+for (i in 1:dim(sel_spe)[1]) {
+  
+  STK<- sel_spe$SPECIES[i]
+  
+    fri_cs1<- subset(fri_cs, year%in% seq(sel_spe$START_YEAR[i],
+                      sel_spe$END_YEAR[i],by=1),table="ca",link=T)
+   
+# Validate- consolidate 
+fri_csv <- csDataVal(fri_cs1)
+fri_csc<- csDataCons(fri_csv, fri_strD)
+  
+  fri_csc1<- subset(fri_csc, space==sel_spe$GSA[i],table="ca")
+  
+MS_SEX_An<-dbeObject(desc="SEX-ratio",species=STK,param="sex",
+                     strataDesc=fri_strD,methodDesc=sel_spe$methodDesc[i],
+                     nboot=sel_spe$nboot[i])
+
+
+if (sel_spe$methodDesc[i]=="bootstrap"){
+MS_SEX_An<-bpBoot(MS_SEX_An,fri_csc1,adjust=F)
+} else {
+MS_SEX_An<-bpEstim(MS_SEX_An,fri_csc1,adjust=F)
+}
+
+dfSRL <-
+  data.frame(
+    
+    COUNTRY = COUNTRY ,
+    AREA = MS_SEX_An@lenStruc[["estim"]][["space"]] ,
+     START_YEAR = sel_spe$START_YEAR[i] ,
+    END_YEAR = sel_spe$END_YEAR[i] ,
+    SPECIES = STK ,
+  
+   UNIT = unique(fri_cs@ca$lenCode[fri_cs@ca$spp==STK]) ,
+    LENGTHCLASS =  as.character(MS_SEX_An@lenStruc[["estim"]][["length"]] ),
+   
+    SEX_RATIO = MS_SEX_An@lenStruc[["estim"]][["value"]],
+    COMMENTS = sel_spe$COMMENTS[i] 
+  )
+
+dfSRL<-dfSRL %>% mutate(SPECIES=sel_spe$SPE[match(STK,sel_spe$SPECIES)])
+
+dfSRL <- dfSRL[complete.cases(dfSRL[ , -which(names(dfSRL) %in% c("COMMENTS"))]),]
+
+srl.temp2=bind_rows(srl.temp2,dfSRL)
+
+
+}
+
+```
+
+##Output
+
+```{r data_ou1}
+
+# export DG MARE Med&BS SRL table
+write.table(format(srl.temp2,digits=3, scientific=F),
+        file="SRL.csv",dec=".",sep=",",col.names=TRUE,row.names=FALSE,na="-1")
+
+head(srl.temp2)
+```
+
+
+

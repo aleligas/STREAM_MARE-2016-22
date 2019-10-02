@@ -1,0 +1,249 @@
+---
+title: "Annex III.5 - STREAM: Auxiliary scripts for the conversion from the SDEF format to DG MARE Med&BS Data Call: Calculation of maturity at age using the COST methods (see COST User Manual- Chapter 12, for the full method description)"
+author: "E. Mantzouni"
+date: "`r date()`"
+output: word_document
+---
+
+
+
+#Tools
+
+R, Rstudio and packages.
+
+
+```{r results='hide', message=FALSE, warning=FALSE}
+#R general option:
+options(stringsAsFactors = FALSE)
+
+options(warn=0)
+
+#chunk option
+knitr::opts_chunk$set(cache=TRUE,echo=TRUE, warning=FALSE, 
+	message=FALSE, fig.height=6,progress=FALSE,verbose=FALSE,
+		include=TRUE,dev='png',autodep=FALSE)
+
+#load packages
+
+library(COSTcore)
+library(COSTeda)
+library(COSTdbe)
+
+library(tidyr)
+library(dplyr)
+```
+
+
+#Example of use of the script MA
+
+This script implements the  Calculation of  maturity at age, 
+required for the JRC  MED &BS Data Call, using as input file the SDEF format (CS table) and COST as the raising proceedure
+
+
+##Settings
+
+```{r data1}
+path <- paste("C:\\Users\\Bitetto Isabella\\OneDrive - Coispa Tecnologia & Ricerca S.C.A.R.L\\MARE22\\STREAM\\FINAL REVISION OF DELIVERABLES\\SDEF_to_DG_MARE_MedBS", sep="") 
+setwd(path)
+  
+```
+
+```{r "setup", include=FALSE}
+require("knitr")
+opts_knit$set(root.dir = path)
+```
+
+##Input Data
+
+csData of the SDEF format and estimate sample size
+
+```{r data_in1}
+load("fri_cs_test.Rdata")
+head( fri_cs@ca)
+
+# extract COUNTRY
+COUNTRY<-unique(fri_cs@ca$landCtry)
+
+```
+ stratification: spatial only
+```{r data_str}
+
+fri_strD <- strIni(spaceStrata="area") 
+
+```
+
+DG MARE Med&BS MA Table template
+
+```{r data_in2}
+
+
+ma.temp2<- read.table("xxx_MA.csv",sep=",",header=T)
+names(ma.temp2)
+```
+
+
+Auxiliary table:  species_BIO_MA.csv
+
+```{r data_in3}
+
+# species file : selected species with FAO three alpha code
+
+sel_spe<-read.table( "species_BIO_MA.csv", header=TRUE, sep=";",row.names=NULL) 
+
+head(sel_spe)
+
+sel_spe<- sel_spe %>% 
+    mutate(SEX = strsplit(as.character(SEX), "_")) %>% 
+    unnest(SEX)
+
+imm=sel_spe%>%separate(IMMATURE,c("a", "b","c","d"), extra = "drop", 
+                       fill = "right",sep="_")
+
+
+```
+
+
+
+## Checking data
+
+
+Set immature stages  based on Auxiliary Table 
+```{r data_immature}
+
+
+# get col w. all=NA by spp
+aa<- fri_cs@ca %>% group_by(spp) %>% summarize_all(~all(is.na(.))) 
+
+
+# if no matScale is spcified, impute "-1"
+fri_cs@ca$matScale[fri_cs@ca$spp %in% aa$spp[aa$matScale==TRUE]]<- "-1"
+
+```
+
+## Data analysis- raising
+
+Analysis by stock
+```{r loop by stock}
+
+for (i in 1:dim(sel_spe)[1]) {
+  
+ 
+ STK<- sel_spe$SPECIES[i]
+ 
+ fri_cs1<- subset(fri_cs, year%in% seq(sel_spe$START_YEAR[i],
+                      sel_spe$END_YEAR[i],by=1),table="ca",link=T)
+  
+    
+       # set immature stages as "I" 
+if (na.omit(unique(fri_cs1@ca$matScale[fri_cs1@ca$spp==STK & 
+              fri_cs1@ca$area==sel_spe$GSA[i]]))!="1-7") {
+  fri_cs1@ca$matStage[fri_cs1@ca$spp==STK & fri_cs1@ca$area==sel_spe$GSA[i] & 
+                    fri_cs1@ca$matStage %in% imm[i,6:9][!is.na(imm[i, 6:9])]]="I"
+  
+} else{ #if "1-7" matScale is used, immature (I)==1
+  fri_cs1@ca$matStage[fri_cs1@ca$spp==STK & fri_cs1@ca$area==sel_spe$GSA[i] & 
+                        fri_cs1@ca$matStage ==1]="I"
+  
+}
+   
+# sample size
+  
+if (sel_spe$SEX[i]=="C"){
+  
+    fri_csv <- csDataVal(fri_cs1)
+  
+    # get sample size
+    
+    nml<- data.frame(fri_cs1@ca) %>% filter(!is.na(matStage)& !is.na(age))%>% 
+      dplyr::group_by(area,spp,age)%>% summarize(SAMPLE_SIZE=n())
+    
+
+} else { 
+   
+  
+   fri_cs1=subset(fri_cs1,sex==sel_spe$SEX[i],table="ca",link=T)
+  fri_csv <- csDataVal(fri_cs1)
+  
+  # get sample size
+  nml<- data.frame(fri_cs1@ca) %>% filter(!is.na(matStage)& !is.na(age))%>% 
+    dplyr::group_by(area,spp,age,sex)%>% summarize(SAMPLE_SIZE=n())
+ 
+}
+  
+  
+     fri_csv1<- subSetSpp(fri_csv, STK)
+   fri_csv1<- subset(fri_csv1, area%in% sel_spe$GSA[i],table="ca")
+       
+  fri_csc1 <- csDataCons(fri_csv1, fri_strD)
+  
+  fri_csc1@ca$matStage=as.character(fri_csc1@ca$matStage)
+
+
+MS_MAT_An<-dbeObject(desc=" Maturity-at-age",species=STK,param="maturity",
+                     strataDesc=fri_strD,methodDesc=sel_spe$methodDesc[i],
+                     nboot=sel_spe$nboot[i])
+
+
+if (sel_spe$methodDesc[i]=="bootstrap"){
+MS_MAT_An<-bpBoot(MS_MAT_An,fri_csc1,adjust=sel_spe$adjust[i],immature.scale="I")
+
+} else { # analytical
+MS_MAT_An<-bpEstim(MS_MAT_An,fri_csc1,adjust=sel_spe$adjust[i],immature.scale="I")
+}
+
+
+
+dfMA <-
+  data.frame(
+    
+    COUNTRY =COUNTRY ,
+    AREA = unique(MS_MAT_An@ageStruc[["estim"]][["space"]] ),
+    START_YEAR = sel_spe$START_YEAR[i] ,
+    END_YEAR = sel_spe$END_YEAR[i] ,
+    SPECIES = STK ,
+    SEX = sel_spe$SEX[i],
+    
+    AGECLASS =  as.numeric(as.character(MS_MAT_An@ageStruc[["estim"]][["age"]] )),
+
+    PRM = MS_MAT_An@ageStruc[["estim"]][["value"]] ,
+    METHOD_USED = sel_spe$MAT_METHOD[i]
+  
+  )
+
+if (sel_spe$SEX[i]=="C"){
+  
+dfMA <-  dfMA %>%
+           left_join(nml, by = c("AREA" = 'area', 'SPECIES' = 'spp',
+                           "AGECLASS"="age")) %>%   mutate(SPECIES =  sel_spe$SPE[i]) 
+                           # FAO three alpha code 
+} else{
+  
+  dfMA <-  dfMA %>%
+           left_join(nml, by = c("AREA" = 'area', 'SPECIES' = 'spp', 
+                            "SEX"="sex","AGECLASS"="age")) %>% 
+                            mutate(SPECIES =  sel_spe$SPE[i])
+                             # FAO three alpha code 
+  
+}
+
+ma.temp2<- bind_rows(ma.temp2,na.omit(dfMA))
+
+}
+
+
+
+```
+
+##Output
+
+```{r data_ou1}
+
+# export DG MARE Med&BS MA table
+write.table(format(ma.temp2,digits=3, scientific=F), file=paste("MA.csv",sep=""),
+            dec=".",sep=",",col.names=TRUE, row.names=FALSE,na="-1")
+
+head(ma.temp2)
+```
+
+
+
