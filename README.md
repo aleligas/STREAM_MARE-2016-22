@@ -1,1 +1,1 @@
-# STREAM_MARE-2016-22
+# R scripts and routines developed under STREAM project "STrengthening REgional cooperation in the Area of fisheries biological data collection in the Mediterranean and Black Sea", granted under the EU Call for Proposals MARE-2016-22 and coordinated by Alessandro Ligas (ligas@cibm.it)
