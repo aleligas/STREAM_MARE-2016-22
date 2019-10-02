@@ -1,0 +1,35 @@
+ID,COUNTRY,AREA,START_YEAR,END_YEAR,SPECIES,SEX,VB_LINF,VB_K,VB_T0,VB_SAMPLE_SIZE,BB_SIZE_RANGE,VB_UNITS,VB_METHOD_USED,A,B,L_W_SAMPLE_SIZE,L_W_SIZE_RANGE,L_W_UNITS,L_W_METHOD_USED,SPAWNING_SEASON,SPAWNING_PEAK,COMMENTS
+22075,XXX,999,2006,2006,DPS,F,45.15,0.65,-0.6534,6314,15.0-43.0,mm,length frequency analysis,999,999,999,NA,NA,NA,February-December,April-July,NC
+22076,XXX,999,2006,2006,DPS,M,36.25,0.44,-0.4512,4666,15.0-42.0,mm,length frequency analysis,999,999,999,NA,NA,NA,February-December,April-July,NC
+22077,XXX,999,2007,2007,DPS,F,47.25,0.62,-0.6375,6732,13.0-45.0,mm,length frequency analysis,999,999,999,NA,NA,NA,February-December,April-July,NC
+22078,XXX,999,2007,2007,DPS,M,37,0.64,-0.6226,5250,15.0-38.0,mm,length frequency analysis,999,999,999,NA,NA,NA,February-December,April-July,NC
+22079,XXX,999,2008,2008,DPS,C,999,999,0,999,NA,mm,NA,0.0038,2.4298,267,13-34 mm,mm/g,L-W regression analysis DCF data,February-December,April-July,NC
+22080,XXX,999,2008,2008,DPS,F,46.85,0.61,-0.6292,11869,13.0-45.0,mm,length frequency analysis,0.0054,2.326,154,13-34 mm,mm/g,L-W regression analysis DCF data,February-December,April-July,NC
+22081,XXX,999,2008,2008,DPS,M,999,999,0,999,NA,mm,NA,0.0074,2.2037,116,16-25 mm,mm/g,L-W regression analysis DCF data,February-December,April-July,NC
+22082,XXX,999,2009,2009,DPS,C,999,999,0,999,NA,mm,NA,0.0047,2.3754,458,14-35 mm,mm/g,L-W regression analysis DCF data,February-December,April-July,NC
+22083,XXX,999,2009,2009,DPS,F,51.45,0.51,-0.5596,17403,8.0-49,mm,length frequency analysis,0.0033,2.4859,214,20-35 mm,mm/g,L-W regression analysis DCF data,February-December,April-July,NC
+22084,XXX,999,2009,2009,DPS,M,42.5,0.54,-0.5626,7845,9.0-42.0,mm,length frequency analysis,0.0063,2.274,225,18-29 mm,mm/g,L-W regression analysis DCF data,February-December,April-July,NC
+22085,XXX,999,2010,2010,DPS,C,999,999,0,999,NA,mm,NA,0.0034,2.4559,2916,11-42 mm,mm/g,L-W regression analysis DCF data,February-December,April-July,NC
+22086,XXX,999,2010,2010,DPS,F,46,0.54,-0.572,66568,9.0-47.0,mm,length frequency analysis,0.0038,2.4323,1813,11-42 mm,mm/g,L-W regression analysis DCF data,February-December,April-July,NC
+22087,XXX,999,2010,2010,DPS,M,44,0.25,-0.2195,12594,9.0-46.0,mm,length frequency analysis,0.0062,2.2546,1097,14-36 mm,mm/g,L-W regression analysis DCF data,February-December,April-July,NC
+22088,XXX,999,2011,2011,DPS,C,999,999,0,999,NA,mm,NA,0.0034,2.4505,3427,11-46 mm,mm/g,L-W regression analysis DCF data,February-December,April-July,NC
+22089,XXX,999,2011,2011,DPS,F,49.35,0.52,-0.5634,36232,7.0-47.0,mm,length frequency analysis,0.0043,2.3872,1941,11-46 mm,mm/g,L-W regression analysis DCF data,February-December,April-July,NC
+22090,XXX,999,2011,2011,DPS,M,39,0.51,-0.5265,43571,8.0-41.0,mm,length frequency analysis,0.0043,2.3872,1491,14-41 mm,mm/g,L-W regression analysis DCF data,February-December,April-July,NC
+22091,XXX,999,2012,2012,DPS,C,999,999,0,999,NA,mm,NA,0.0017,2.6684,3517,11-46 mm,mm/g,L-W regression analysis DCF data,February-December,April-July,NC
+22092,XXX,999,2012,2012,DPS,F,48,0.41,-0.4529,33994,12.0-46.0,mm,length frequency analysis,0.0016,2.6886,1894,13-46 mm,mm/g,L-W regression analysis DCF data,February-December,April-July,NC
+22093,XXX,999,2012,2012,DPS,M,38,0.65,-0.6328,28014,11.0-42.0,mm,length frequency analysis,0.0019,2.6346,1587,11-42 mm,mm/g,L-W regression analysis DCF data,February-December,April-July,NC
+22094,XXX,999,2013,2013,DPS,C,999,999,0,999,NA,mm,NA,0.0022,2.5855,4799,13-46 mm,mm/g,L-W regression analysis DCF data,February-December,April-July,NC
+22095,XXX,999,2013,2013,DPS,F,48,0.42,-0.4638,34163,9.0-46.0,mm,length frequency analysis,0.0028,2.518,2400,13-46 mm,mm/g,L-W regression analysis DCF data,February-December,April-July,NC
+22096,XXX,999,2013,2013,DPS,M,39.5,0.72,-0.6835,30247,10.0-40.0,mm,length frequency analysis,0.0021,2.5975,2380,13-40 mm,mm/g,L-W regression analysis DCF data,February-December,April-July,NC
+22097,XXX,999,2014,2014,DPS,C,999,999,0,999,NA,mm,NA,0.002,2.611,2121, 12-41 mm,mm/g,L-W regression analysis DCF data,February-December,April-July,NC
+22098,XXX,999,2014,2014,DPS,F,42.85,0.44,-0.4712,34758,9.0-46.0,mm,length frequency analysis,0.0019,2.6339,1281, 12-41 mm,mm/g,L-W regression analysis DCF data,February-December,April-July,NC
+22099,XXX,999,2014,2014,DPS,M,36,0.7,-0.6597,38695,5.0-40.0,mm,length frequency analysis,0.0028,2.4973,720, 12-30 mm,mm/g,L-W regression analysis DCF data,February-December,April-July,NC
+22100,XXX,999,2015,2015,DPS,C,999,999,0,999,NA,mm,NA,0.003,2.5,3564, 10-42 mm,mm/g,L-W regression analysis DCF data,February-December,April-July,NC
+22101,XXX,999,2015,2015,DPS,F,43,0.78,-0.7297,95653,8.0-42.0,mm,length frequency analysis,0.0017,2.6783,2214, 13-42 mm,mm/g,L-W regression analysis DCF data,February-December,April-July,NC
+22102,XXX,999,2015,2015,DPS,M,40,0.49,-0.5115,78757,8.0-42.0,mm,length frequency analysis,0.0055,2.3001,1383, 13-35 mm,mm/g,L-W regression analysis DCF data,February-December,April-July,NC
+22103,XXX,999,2016,2016,DPS,C,999,999,0,999,NA,mm,NA,0.003,2.5049,7573,11-46 mm,mm/g,L-W regression analysis DCF data,February-December,April-July,NC
+22104,XXX,999,2016,2016,DPS,F,38.8,0.64,-0.6283,999,NA,mm,length frequency analysis,0.0028,2.5238,5436,12-46 mm,mm/g,L-W regression analysis DCF data,February-December,April-July,NC
+22105,XXX,999,2016,2016,DPS,M,32,0.89,-0.7539,999,NA,mm,length frequency analysis,0.0036,2.4389,2085,11-40 mm,mm/g,L-W regression analysis DCF data,February-December,April-July,NC
+22106,XXX,999,2017,2017,DPS,C,999,999,0,999,NA,mm,NA,0.0029,2.5007,7447,12-45 mm,mm/g,L-W regression analysis DCF data,February-December,April-July,NC
+22107,XXX,999,2017,2017,DPS,F,46.5,0.56,-0.5897,1851,6.0-45.0,mm,length frequency analysis,0.0028,2.514,5123,14-45 mm,mm/g,L-W regression analysis DCF data,February-December,April-July,NC
+22108,XXX,999,2017,2017,DPS,M,41.5,0.49,-0.5159,619,9.0-40.0,mm,length frequency analysis,0.0033,2.4574,2310,12-40 mm,mm/g,L-W regression analysis DCF data,February-December,April-July,NC
